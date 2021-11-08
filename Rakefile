@@ -1,19 +1,14 @@
 require "yaml"
 require "fileutils"
 
-# we load the bento gem here just so we can make sure it was installed
-begin
-  require "bento"
-rescue LoadError
-  puts "bento-ya gem does't appear to be installed. Either install the gem or bundle install first."
-  exit!
-end
-
 desc "Validate all templates using Packer"
 task :validate do
-  Dir.glob("**/*.json").each do |template_path|
+  Dir.glob("packer_templates/**/*.json").sort.each do |template_path|
     template_dir = File.dirname(template_path)
     filename = File.basename(template_path)
+
+    # we can't validatem the amazon config with the ovf file
+    next if filename == "amazon-2-x86_64.json"
 
     puts "\n\e[32mValidating #{template_path}\e[0m\n\n"
     result = system("packer validate #{filename}", chdir: template_dir)
@@ -21,7 +16,7 @@ task :validate do
   end
 end
 
-desc "clean, build, test, upload"
+desc "clean repo, build boxes, test, and upload/release"
 task :do_all do
   check_env
   public_templates.each do |template|
@@ -29,7 +24,9 @@ task :do_all do
       Rake::Task[:clean].execute
       sh build_cmd(template)
       sh "bento test"
-      unless ENV["BENTO_AUTO_RELEASE"].nil?
+      if ENV["BENTO_AUTO_RELEASE"].nil? || ENV["BENTO_VERSION"].nil?
+        puts "skipping the upload / release of #{template} as BENTO_AUTO_RELEASE and BENTO_VERSION env vars were not set"
+      else
         sh "bento upload"
         sh "bento release #{template} #{ENV["BENTO_VERSION"]}"
       end
@@ -37,6 +34,7 @@ task :do_all do
   end
 end
 
+desc "release all built boxes on vagrant cloud"
 task :release_all do
   config['public'].each do |template|
     sh "bento release #{template} #{ENV["BENTO_VERSION"]}"

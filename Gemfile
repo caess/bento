@@ -1,3 +1,8 @@
 source "https://rubygems.org"
 
-gem "bento-ya"
+gemspec
+
+group :development do
+  gem "cookstyle"
+  gem "rake", ">= 12"
+end
